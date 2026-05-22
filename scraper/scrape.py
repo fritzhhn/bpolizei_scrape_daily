@@ -230,7 +230,11 @@ def main() -> int:
         stats["articles_unchanged"],
         stats["errors"],
     )
-    return 1 if stats["errors"] else 0
+    if stats["listings_found"] == 0:
+        return 1
+    if stats["articles_fetched"] == 0 and stats["errors"] > 0:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
