@@ -119,7 +119,7 @@ git init
 git add .
 git commit -m "Initial commit: Polizeimeldungen Scraper & Dashboard"
 # Auf GitHub leeres Repo erstellen, dann:
-git remote add origin https://github.com/DEIN_USER/polizei-meldungen-berlin.git
+git remote add origin https://github.com/fritzhhn/bpolizei_scrape_daily.git
 git branch -M main
 git push -u origin main
 ```
