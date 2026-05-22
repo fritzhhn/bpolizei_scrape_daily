@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block content %}
+{% if not ready %}
+<div class="notice">
+  <strong>Noch keine Daten.</strong><br>
+  <code>python -m scraper.scrape --mode current</code>
+</div>
+{% else %}
+
+<div class="stats-bar">
+  <div><strong>{{ stats.total }}</strong>Meldungen</div>
+  <div><strong>{{ stats.districts }}</strong>Bezirke</div>
+  <div><strong>{{ format_datetime(stats.newest) }}</strong>Neueste</div>
+  <div><strong>{{ stats.with_images or 0 }}</strong>mit Bildern</div>
+</div>
+
+<div class="card">
+  <form class="filters" method="get">
+    <div>
+      <label for="q">Suche</label>
+      <input type="search" id="q" name="q" value="{{ q }}" placeholder="Titel, Text, Tags…" style="min-width:180px">
+    </div>
+    <div>
+      <label for="district">Bezirk</label>
+      <select id="district" name="district">
+        <option value="">Alle</option>
+        {% for d in districts %}
+        <option value="{{ d.district }}" {% if district_filter == d.district %}selected{% endif %}>{{ d.district }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="tag">Kategorie</label>
+      <select id="tag" name="tag">
+        <option value="">Alle</option>
+        {% for t, c in popular_tags %}
+        <option value="{{ t }}" {% if tag_filter == t %}selected{% endif %}>{{ t }} ({{ c }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit">Filtern</button>
+    {% if q or district_filter or tag_filter %}<a href="/" style="align-self:center">Zurücksetzen</a>{% endif %}
+  </form>
+  <p style="margin:0;font-size:0.85rem;color:var(--muted)">{{ total }} Treffer · chronologisch</p>
+</div>
+
+<div class="card" style="padding-top:0.5rem">
+  {% for m in meldungen %}
+  <article class="meldung-card">
+    <h2><a href="/meldung/{{ m.id }}">{{ m.title }}</a></h2>
+
+    <div class="meta-row">
+      {% if m.published_at %}<span><strong>Veröffentlicht</strong> {{ format_datetime(m.published_at) }}</span>{% endif %}
+      {% if m.meldung_date %}<span><strong>Meldung</strong> {{ m.meldung_date }}</span>{% endif %}
+      {% if m.district %}<span><strong>Ereignisort</strong> {{ m.district }}</span>{% endif %}
+      {% if m.case_number %}<span class="nr"><strong>Nr.</strong> {{ m.case_number }}</span>{% endif %}
+      <span class="nr">ID {{ m.id }}</span>
+    </div>
+
+    {% if m.tags_list %}
+    <div class="tag-cloud">
+      {% for t in m.tags_list %}
+      <a class="tag" href="?tag={{ t|urlencode }}">{{ t }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if m.summary %}
+    <p class="summary">{{ m.summary }}</p>
+    {% endif %}
+
+    {% if m.images_list %}
+    <div class="images">
+      {% for img in m.images_list %}
+      <img src="{{ img.src }}" alt="{{ img.alt }}" loading="lazy" width="200">
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if m.body_text %}
+    <p style="margin:0.6rem 0 0;font-family:'Source Serif 4',serif;font-size:0.98rem;color:var(--muted)">
+      {{ m.body_text[:320] }}{% if m.body_text|length > 320 %}…{% endif %}
+      <a href="/meldung/{{ m.id }}">Volltext</a>
+    </p>
+    {% endif %}
+
+    <p style="margin:0.5rem 0 0;font-size:0.82rem">
+      <a href="{{ m.url }}" target="_blank" rel="noopener">Original ↗</a>
+    </p>
+  </article>
+  {% else %}
+  <p style="color:var(--muted);padding:1rem 0">Keine Meldungen.</p>
+  {% endfor %}
+
+  {% if pages > 1 %}
+  <div class="pagination">
+    {% if page > 1 %}<a href="?page={{ page-1 }}&q={{ q }}&district={{ district_filter }}&tag={{ tag_filter }}">← Zurück</a>{% endif %}
+    <span> Seite {{ page }} / {{ pages }} </span>
+    {% if page < pages %}<a href="?page={{ page+1 }}&q={{ q }}&district={{ district_filter }}&tag={{ tag_filter }}">Weiter →</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if runs %}
+<div class="card" style="font-size:0.85rem;color:var(--muted)">
+  <strong>Letzter Scrape:</strong>
+  {{ runs[0].started_at[:16] }} · Modus {{ runs[0].mode }} ·
+  {{ runs[0].articles_fetched }} geladen, {{ runs[0].articles_new }} neu, {{ runs[0].articles_updated }} aktualisiert
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

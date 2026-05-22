@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Polizeimeldungen Berlin{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f4f1eb;
+      --paper: #fffdf9;
+      --ink: #1a1f26;
+      --muted: #5c6573;
+      --line: #d8d2c8;
+      --accent: #1e4d8c;
+      --accent-soft: #e8f0fa;
+      --tag-bg: #eef2f6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Source Sans 3", system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 1.25rem 1.5rem 3rem; }
+    header {
+      border-bottom: 2px solid var(--ink);
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    header h1 {
+      margin: 0;
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: 1.65rem;
+      font-weight: 600;
+    }
+    header .sub { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.92rem; }
+    a { color: var(--accent); }
+    a:hover { text-decoration: underline; }
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1.1rem 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 0 rgba(0,0,0,.04);
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin: 0.5rem 0 0.75rem;
+    }
+    .meta-row strong { color: var(--ink); font-weight: 500; }
+    .tag {
+      display: inline-block;
+      font-size: 0.78rem;
+      padding: 0.15rem 0.5rem;
+      background: var(--tag-bg);
+      border-radius: 3px;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    a.tag:hover { background: var(--accent-soft); }
+    .summary {
+      font-size: 1.02rem;
+      color: var(--ink);
+      margin: 0.5rem 0;
+      font-style: italic;
+    }
+    .body-text {
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: 1.05rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      margin-top: 1rem;
+    }
+    .field-grid {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 0.35rem 1rem;
+      font-size: 0.92rem;
+      margin: 1rem 0;
+    }
+    .field-grid dt { color: var(--muted); margin: 0; }
+    .field-grid dd { margin: 0; }
+    .meldung-card {
+      padding: 1.25rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .meldung-card:last-child { border-bottom: none; }
+    .meldung-card h2 {
+      margin: 0;
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: 1.2rem;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+    .meldung-card h2 a { color: inherit; text-decoration: none; }
+    .meldung-card h2 a:hover { color: var(--accent); text-decoration: underline; }
+    .nr { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.85rem; }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      align-items: end;
+      margin-bottom: 0.75rem;
+    }
+    label { font-size: 0.75rem; color: var(--muted); display: block; margin-bottom: 0.15rem; }
+    input, select, button {
+      font: inherit;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--paper);
+    }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .stats-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .stats-bar strong { color: var(--ink); font-size: 1.1rem; display: block; }
+    .images img {
+      max-width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      margin: 0.5rem 0.5rem 0 0;
+    }
+    .notice {
+      background: var(--accent-soft);
+      border: 1px solid #b8cfe8;
+      padding: 1rem;
+      border-radius: 4px;
+    }
+    .back { font-size: 0.9rem; margin-bottom: 1rem; display: inline-block; }
+    .pagination { margin-top: 1rem; font-size: 0.9rem; }
+    .tag-cloud { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1><a href="/" style="color:inherit;text-decoration:none">Polizeimeldungen Berlin</a></h1>
+      <p class="sub">Archiv · Daten von <a href="https://www.berlin.de/polizei/polizeimeldungen/">berlin.de</a></p>
+    </header>
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>
