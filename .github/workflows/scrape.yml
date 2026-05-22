@@ -44,7 +44,10 @@ jobs:
           mkdir -p data/logs
           PYTHONPATH=. python -m scraper.scrape $ARGS
 
-      - name: Datenbank committen
+      - name: GitHub Pages generieren
+        run: PYTHONPATH=. python scripts/generate_pages.py
+
+      - name: Daten & Pages committen
         run: |
           if [ ! -f data/meldungen.db ]; then
             echo "Keine Datenbank erzeugt."
@@ -52,10 +55,10 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/meldungen.db
+          git add data/meldungen.db docs/index.html
           if git diff --staged --quiet; then
-            echo "Keine Änderungen an meldungen.db"
+            echo "Keine Änderungen"
           else
-            git commit -m "chore(data): Meldungen aktualisiert ($(date -u +%Y-%m-%d))"
+            git commit -m "chore(data): Meldungen & Pages aktualisiert ($(date -u +%Y-%m-%d))"
             git push
           fi
