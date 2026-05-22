@@ -128,7 +128,7 @@ class BerlinPolizeiScraper:
                 rows = conn.execute("SELECT id FROM meldungen").fetchall()
                 existing_ids = {r["id"] for r in rows}
 
-            for teaser in teaser_list:
+            for i, teaser in enumerate(teaser_list, start=1):
                 if skip_existing and teaser["id"] in existing_ids:
                     continue
                 try:
@@ -141,6 +141,13 @@ class BerlinPolizeiScraper:
                         stats["articles_updated"] += 1
                     else:
                         stats["articles_unchanged"] += 1
+                    if i % 100 == 0:
+                        conn.commit()
+                        log.info(
+                            "Zwischenstand: %d/%d Artikel",
+                            stats["articles_fetched"],
+                            len(teaser_list),
+                        )
                 except Exception as e:
                     log.exception("Fehler bei %s: %s", teaser["url"], e)
                     stats["errors"] += 1
