@@ -34,6 +34,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Scraper ausführen
+        id: scrape
+        continue-on-error: true
         env:
           MODE: ${{ github.event.inputs.mode || 'daily' }}
         run: |
@@ -45,9 +47,11 @@ jobs:
           PYTHONPATH=. python -m scraper.scrape $ARGS
 
       - name: GitHub Pages generieren
+        if: always()
         run: PYTHONPATH=. python scripts/generate_pages.py
 
       - name: Daten & Pages committen
+        if: always()
         run: |
           if [ ! -f data/meldungen.db ]; then
             echo "Keine Datenbank erzeugt."

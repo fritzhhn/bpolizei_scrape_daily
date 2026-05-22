@@ -37,12 +37,32 @@ class BerlinPolizeiScraper:
         self.session.headers.update({"User-Agent": USER_AGENT})
         self.delay = delay
 
-    def fetch(self, url: str) -> str:
-        time.sleep(self.delay)
-        resp = self.session.get(url, timeout=REQUEST_TIMEOUT_SEC)
-        resp.raise_for_status()
-        resp.encoding = resp.apparent_encoding or "utf-8"
-        return resp.text
+    def fetch(self, url: str, retries: int = 5) -> str:
+        last_err: Exception | None = None
+        for attempt in range(retries):
+            time.sleep(self.delay * (1 + attempt * 0.5))
+            try:
+                resp = self.session.get(url, timeout=REQUEST_TIMEOUT_SEC)
+                if resp.status_code in (429, 502, 503):
+                    wait = min(120, 10 * (2**attempt))
+                    log.warning(
+                        "HTTP %s für %s – warte %ds (Versuch %d/%d)",
+                        resp.status_code,
+                        url,
+                        wait,
+                        attempt + 1,
+                        retries,
+                    )
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                resp.encoding = resp.apparent_encoding or "utf-8"
+                return resp.text
+            except requests.RequestException as e:
+                last_err = e
+                if attempt + 1 < retries:
+                    time.sleep(min(60, 5 * (2**attempt)))
+        raise last_err or RuntimeError(f"Fetch fehlgeschlagen: {url}")
 
     def collect_listing_urls(self, base_url: str) -> list[dict]:
         """Alle Teaser von einer Übersichtsseite (mit Pagination)."""
