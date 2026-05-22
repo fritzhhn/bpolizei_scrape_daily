@@ -5,16 +5,24 @@ from __future__ import annotations
 
 import sqlite3
 from collections import Counter
+from datetime import datetime
 from math import ceil
 
 from flask import Flask, abort, render_template, request
 
-from dashboard.helpers import enrich_row, format_datetime
-from scraper.config import DB_PATH
+from dashboard.helpers import (
+    YEAR_FILTER_SQL,
+    YEAR_SQL,
+    enrich_row,
+    fill_years_range,
+    format_datetime,
+)
+from scraper.config import ARCHIV_START_YEAR, DB_PATH
 from scraper.parse import tags_from_json
 
 app = Flask(__name__)
 PER_PAGE = 40
+CURRENT_YEAR = datetime.now().year
 
 
 def get_db():
@@ -59,7 +67,7 @@ def index():
         conditions.append("district = ?")
         params.append(district)
     if year.isdigit():
-        conditions.append("source_year = ?")
+        conditions.append(YEAR_FILTER_SQL)
         params.append(int(year))
     if tag:
         conditions.append("tags LIKE ?")
@@ -76,7 +84,8 @@ def index():
 
     rows = conn.execute(
         f"""
-        SELECT id, title, published_at, district, case_number, tags, source_year
+        SELECT id, title, published_at, meldung_date, district, case_number, tags,
+               source_year, {YEAR_SQL} AS pub_year
         FROM meldungen {where}
         ORDER BY published_at DESC NULLS LAST, id DESC
         LIMIT ? OFFSET ?
@@ -87,11 +96,12 @@ def index():
     meldungen = [enrich_row(r) for r in rows]
 
     stats = conn.execute(
-        """
+        f"""
         SELECT
             COUNT(*) AS total,
             COUNT(DISTINCT district) AS districts,
-            COUNT(DISTINCT source_year) AS years,
+            MIN({YEAR_SQL}) AS year_min,
+            MAX({YEAR_SQL}) AS year_max,
             MIN(published_at) AS oldest,
             MAX(published_at) AS newest,
             SUM(CASE WHEN images IS NOT NULL AND images != '[]' THEN 1 ELSE 0 END) AS with_images,
@@ -99,6 +109,7 @@ def index():
             SUM(CASE WHEN tags IS NOT NULL AND tags != '[]' THEN 1 ELSE 0 END) AS with_tags,
             ROUND(AVG(LENGTH(body_text))) AS avg_body_len
         FROM meldungen
+        WHERE COALESCE(published_at, meldung_date) IS NOT NULL
         """
     ).fetchone()
 
@@ -111,15 +122,19 @@ def index():
         params,
     ).fetchone()
 
-    by_year = conn.execute(
-        """
-        SELECT source_year AS year, COUNT(*) AS count
+    by_year_raw = conn.execute(
+        f"""
+        SELECT {YEAR_SQL} AS year, COUNT(*) AS count
         FROM meldungen
-        WHERE source_year IS NOT NULL
-        GROUP BY source_year
+        WHERE COALESCE(published_at, meldung_date) IS NOT NULL
+          AND {YEAR_SQL} BETWEEN ? AND ?
+        GROUP BY year
         ORDER BY year DESC
-        """
+        """,
+        (ARCHIV_START_YEAR, CURRENT_YEAR),
     ).fetchall()
+
+    by_year = fill_years_range(by_year_raw, ARCHIV_START_YEAR, CURRENT_YEAR)
 
     by_district = conn.execute(
         """
@@ -155,13 +170,7 @@ def index():
         """
     ).fetchall()
 
-    years = conn.execute(
-        """
-        SELECT DISTINCT source_year AS year
-        FROM meldungen WHERE source_year IS NOT NULL
-        ORDER BY year DESC
-        """
-    ).fetchall()
+    years = list(range(CURRENT_YEAR, ARCHIV_START_YEAR - 1, -1))
 
     runs = conn.execute(
         "SELECT * FROM scrape_runs ORDER BY id DESC LIMIT 3"
@@ -170,9 +179,6 @@ def index():
     conn.close()
 
     max_year_count = max((r["count"] for r in by_year), default=1)
-    max_district_count = max((r["count"] for r in by_district), default=1)
-    max_month_count = max((r["count"] for r in by_month), default=1)
-    max_tag_count = popular_tags[0][1] if popular_tags else 1
 
     return render_template(
         "index.html",
@@ -185,7 +191,7 @@ def index():
         by_month=by_month,
         popular_tags=popular_tags,
         districts=districts,
-        years=[r["year"] for r in years],
+        years=years,
         runs=runs,
         q=q,
         district_filter=district,
@@ -196,9 +202,10 @@ def index():
         total=total,
         format_datetime=format_datetime,
         max_year_count=max_year_count,
-        max_district_count=max_district_count,
-        max_month_count=max_month_count,
-        max_tag_count=max_tag_count,
+        max_district_count=max((r["count"] for r in by_district), default=1),
+        max_month_count=max((r["count"] for r in by_month), default=1),
+        max_tag_count=popular_tags[0][1] if popular_tags else 1,
+        year_range=f"{ARCHIV_START_YEAR}–{CURRENT_YEAR}",
     )
 
 

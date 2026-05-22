@@ -17,8 +17,8 @@
     <span class="stat-label">Bezirke</span>
   </div>
   <div class="stat-card">
-    <span class="stat-value">{{ stats.years }}</span>
-    <span class="stat-label">Jahre im Archiv</span>
+    <span class="stat-value">{{ year_range }}</span>
+    <span class="stat-label">Zeitraum</span>
   </div>
   <div class="stat-card">
     <span class="stat-value">{{ stats.with_tags or 0 }}</span>
@@ -49,12 +49,12 @@
 <div class="layout-2col">
   <aside class="sidebar-stats">
     <div class="card compact">
-      <h3>Nach Jahr</h3>
+      <h3>Nach Jahr ({{ year_range }})</h3>
       <ul class="bar-list">
         {% for row in by_year %}
-        <li>
+        <li class="{% if row.count == 0 %}year-empty{% endif %}">
           <a href="?year={{ row.year }}" class="bar-label">{{ row.year }}</a>
-          <span class="bar-track"><span class="bar-fill" style="width:{{ (row.count / max_year_count * 100)|int }}%"></span></span>
+          <span class="bar-track"><span class="bar-fill" style="width:{{ (row.count / max_year_count * 100)|int if row.count else 0 }}%"></span></span>
           <span class="bar-count">{{ row.count }}</span>
         </li>
         {% endfor %}

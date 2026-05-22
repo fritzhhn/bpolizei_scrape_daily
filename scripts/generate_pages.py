@@ -8,8 +8,10 @@ import sqlite3
 from collections import Counter
 from pathlib import Path
 
-from scraper.config import DB_PATH
+from scraper.config import ARCHIV_START_YEAR, DB_PATH
 from scraper.parse import tags_from_json
+
+YEAR_SQL = "CAST(substr(COALESCE(published_at, meldung_date || 'T00:00:00'), 1, 4) AS INTEGER)"
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 RECENT_LIMIT = 80
@@ -35,15 +37,25 @@ def main() -> None:
         ).fetchone()
     )
 
-    by_year = [
-        dict(r)
+    from datetime import datetime
+
+    end_year = datetime.now().year
+    by_year_rows = {
+        int(r["year"]): int(r["count"])
         for r in conn.execute(
-            """
-            SELECT source_year AS year, COUNT(*) AS count
-            FROM meldungen WHERE source_year IS NOT NULL
-            GROUP BY source_year ORDER BY year DESC
-            """
+            f"""
+            SELECT {YEAR_SQL} AS year, COUNT(*) AS count
+            FROM meldungen
+            WHERE COALESCE(published_at, meldung_date) IS NOT NULL
+              AND {YEAR_SQL} BETWEEN ? AND ?
+            GROUP BY year
+            """,
+            (ARCHIV_START_YEAR, end_year),
         )
+    }
+    by_year = [
+        {"year": y, "count": by_year_rows.get(y, 0)}
+        for y in range(end_year, ARCHIV_START_YEAR - 1, -1)
     ]
 
     by_district = [
@@ -170,7 +182,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="bar"><span>${i[labelKey]}</span><span class="track"><span class="fill ${cls}" style="width:${(i[countKey]/max(items,countKey))*100}%"></span></span><span>${i[countKey]}</span></div>
     `).join('');
     document.getElementById('sidebar').innerHTML = `
-      <div class="card"><h2>Nach Jahr</h2>${bar(DATA.by_year,'year','count')}</div>
+      <div class="card"><h2>Nach Jahr (2014–heute)</h2>${bar(DATA.by_year,'year','count')}</div>
       <div class="card"><h2>Top Bezirke</h2>${bar(DATA.by_district,'district','count','d')}</div>
       <div class="card"><h2>Kategorien</h2>${bar(DATA.by_tag,'tag','count','t')}</div>`;
     document.getElementById('recent').innerHTML = DATA.recent.map(m => `

@@ -213,6 +213,10 @@ def parse_article_page(html: str, url: str, teaser: dict | None = None) -> dict:
 
     year_match = re.search(r"/polizeimeldungen/(\d{4})/", url)
     source_year = int(year_match.group(1)) if year_match else None
+    if source_year is None and meldung_date:
+        source_year = int(meldung_date[:4])
+    if source_year is None and published_at and len(published_at) >= 4:
+        source_year = int(published_at[:4])
 
     return {
         "id": article_id,
