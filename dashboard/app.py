@@ -10,19 +10,25 @@ from math import ceil
 
 from flask import Flask, abort, render_template, request
 
+from urllib.parse import urlencode
+
 from dashboard.helpers import (
     YEAR_FILTER_SQL,
     YEAR_SQL,
+    build_timeline,
+    early_years_note,
     enrich_row,
     fill_years_range,
     format_datetime,
 )
+from dashboard.insights import build_all_insights
 from scraper.config import ARCHIV_START_YEAR, DB_PATH
 from scraper.parse import tags_from_json
 
 app = Flask(__name__)
 PER_PAGE = 40
 CURRENT_YEAR = datetime.now().year
+TIMELINE_MODES = ("month", "week", "season", "weekday", "month_of_year")
 
 
 def get_db():
@@ -43,17 +49,15 @@ def _aggregate_tags(conn) -> list[tuple[str, int]]:
     return counts.most_common(15)
 
 
-@app.route("/")
-def index():
-    conn = get_db()
-    if conn is None:
-        return render_template("index.html", ready=False)
-
-    q = request.args.get("q", "").strip()
-    district = request.args.get("district", "").strip()
-    year = request.args.get("year", "").strip()
-    tag = request.args.get("tag", "").strip()
-    page = max(1, int(request.args.get("page", 1) or 1))
+def _query_params(request_args) -> tuple[str, list, str, str, str, str, str, int]:
+    q = request_args.get("q", "").strip()
+    district = request_args.get("district", "").strip()
+    year = request_args.get("year", "").strip()
+    tag = request_args.get("tag", "").strip()
+    granularity = request_args.get("granularity", "month").strip()
+    if granularity not in TIMELINE_MODES:
+        granularity = "month"
+    page = max(1, int(request_args.get("page", 1) or 1))
 
     conditions = []
     params: list = []
@@ -74,6 +78,16 @@ def index():
         params.append(f'%"{tag}"%')
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    return where, params, q, district, year, tag, granularity, page
+
+
+@app.route("/")
+def index():
+    conn = get_db()
+    if conn is None:
+        return render_template("index.html", ready=False)
+
+    where, params, q, district, year, tag, granularity, page = _query_params(request.args)
 
     total = conn.execute(
         f"SELECT COUNT(*) FROM meldungen {where}", params
@@ -106,8 +120,7 @@ def index():
             MAX(published_at) AS newest,
             SUM(CASE WHEN images IS NOT NULL AND images != '[]' THEN 1 ELSE 0 END) AS with_images,
             SUM(CASE WHEN case_number IS NOT NULL AND case_number != '' THEN 1 ELSE 0 END) AS with_case_number,
-            SUM(CASE WHEN tags IS NOT NULL AND tags != '[]' THEN 1 ELSE 0 END) AS with_tags,
-            ROUND(AVG(LENGTH(body_text))) AS avg_body_len
+            SUM(CASE WHEN tags IS NOT NULL AND tags != '[]' THEN 1 ELSE 0 END) AS with_tags
         FROM meldungen
         WHERE COALESCE(published_at, meldung_date) IS NOT NULL
         """
@@ -115,8 +128,7 @@ def index():
 
     filtered_stats = conn.execute(
         f"""
-        SELECT COUNT(*) AS total,
-               COUNT(DISTINCT district) AS districts
+        SELECT COUNT(*) AS total, COUNT(DISTINCT district) AS districts
         FROM meldungen {where}
         """,
         params,
@@ -128,57 +140,44 @@ def index():
         FROM meldungen
         WHERE COALESCE(published_at, meldung_date) IS NOT NULL
           AND {YEAR_SQL} BETWEEN ? AND ?
-        GROUP BY year
-        ORDER BY year DESC
+        GROUP BY year ORDER BY year DESC
         """,
         (ARCHIV_START_YEAR, CURRENT_YEAR),
     ).fetchall()
 
     by_year = fill_years_range(by_year_raw, ARCHIV_START_YEAR, CURRENT_YEAR)
+    timeline_bars, timeline_meta = build_timeline(conn, granularity, where, params)
+    early_note = early_years_note(conn)
+    insights = build_all_insights(conn, where, params)
+    filter_qs = urlencode(
+        {k: v for k, v in [
+            ("q", q), ("district", district), ("year", year), ("tag", tag),
+            ("granularity", granularity),
+        ] if v}
+    )
 
     by_district = conn.execute(
         """
         SELECT district, COUNT(*) AS count
         FROM meldungen
         WHERE district IS NOT NULL AND district != ''
-        GROUP BY district
-        ORDER BY count DESC
-        LIMIT 12
-        """
-    ).fetchall()
-
-    by_month = conn.execute(
-        """
-        SELECT substr(published_at, 1, 7) AS month, COUNT(*) AS count
-        FROM meldungen
-        WHERE published_at IS NOT NULL AND length(published_at) >= 7
-        GROUP BY month
-        ORDER BY month DESC
-        LIMIT 18
+        GROUP BY district ORDER BY count DESC LIMIT 12
         """
     ).fetchall()
 
     popular_tags = _aggregate_tags(conn)
-
     districts = conn.execute(
         """
         SELECT district, COUNT(*) AS count
         FROM meldungen
         WHERE district IS NOT NULL AND district != ''
-        GROUP BY district
-        ORDER BY count DESC, district
+        GROUP BY district ORDER BY count DESC, district
         """
     ).fetchall()
 
     years = list(range(CURRENT_YEAR, ARCHIV_START_YEAR - 1, -1))
-
-    runs = conn.execute(
-        "SELECT * FROM scrape_runs ORDER BY id DESC LIMIT 3"
-    ).fetchall()
-
+    runs = conn.execute("SELECT * FROM scrape_runs ORDER BY id DESC LIMIT 3").fetchall()
     conn.close()
-
-    max_year_count = max((r["count"] for r in by_year), default=1)
 
     return render_template(
         "index.html",
@@ -188,11 +187,17 @@ def index():
         filtered_stats=filtered_stats,
         by_year=by_year,
         by_district=by_district,
-        by_month=by_month,
         popular_tags=popular_tags,
         districts=districts,
         years=years,
         runs=runs,
+        timeline_bars=timeline_bars,
+        timeline_meta=timeline_meta,
+        timeline_modes=TIMELINE_MODES,
+        granularity=granularity,
+        early_note=early_note,
+        insights=insights,
+        filter_qs=filter_qs,
         q=q,
         district_filter=district,
         year_filter=year,
@@ -201,9 +206,8 @@ def index():
         pages=pages,
         total=total,
         format_datetime=format_datetime,
-        max_year_count=max_year_count,
+        max_year_count=max((r["count"] for r in by_year), default=1),
         max_district_count=max((r["count"] for r in by_district), default=1),
-        max_month_count=max((r["count"] for r in by_month), default=1),
         max_tag_count=popular_tags[0][1] if popular_tags else 1,
         year_range=f"{ARCHIV_START_YEAR}–{CURRENT_YEAR}",
     )
@@ -218,8 +222,7 @@ def detail(article_id: str):
     conn.close()
     if row is None:
         abort(404)
-    m = enrich_row(row)
-    return render_template("detail.html", m=m, format_datetime=format_datetime)
+    return render_template("detail.html", m=enrich_row(row), format_datetime=format_datetime)
 
 
 if __name__ == "__main__":

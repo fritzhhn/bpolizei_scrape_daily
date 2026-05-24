@@ -84,12 +84,18 @@ Alternativ per cron (z. B. 6:00):
 
 ```bash
 export PYTHONPATH="."
-python dashboard/app.py
+python -m dashboard.app
 ```
 
 Öffnen: [http://127.0.0.1:5050](http://127.0.0.1:5050)
 
-Funktionen: Suche im Volltext, Filter nach Bezirk/Jahr, Statistik, Detailansicht mit Link zum Original.
+Funktionen: Suche im Volltext, Filter nach Bezirk/Jahr/Kategorie, **Tatzeit & Tatdatum** aus Text, sozialpolitische Auswertungen (Wetter, Bezirk/Einkommen, Gewalt gegen Frauen), Detailansicht mit Link zum Original.
+
+Wetter-Cache (Open-Meteo Berlin, einmalig):
+
+```bash
+PYTHONPATH=. python3 scripts/build_weather_cache.py
+```
 
 ## Daten
 

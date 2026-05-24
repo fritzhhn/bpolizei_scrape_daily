@@ -46,6 +46,305 @@
 <p class="filter-hint">{{ filtered_stats.total }} Treffer in dieser Ansicht · {{ filtered_stats.districts }} Bezirke</p>
 {% endif %}
 
+{% if early_note.total < 100 %}
+<div class="info-box">
+  <strong>Jahre 2014–2019:</strong> Auf berlin.de stehen pro Jahr nur wenige Meldungen online
+  ({% for y in early_note.years %}{{ y.y }}: {{ y.c }}{% if not loop.last %}, {% endif %}{% endfor %}).
+  Unser Archiv enthält <em>alles, was die Website hergibt</em> – kein vollständiges historisches Archiv vor ~2020.
+  Ab 2020 sind die Daten nahezu vollständig ({{ stats.total }} Meldungen gesamt).
+</div>
+{% endif %}
+
+<section class="card interpretation-section">
+  <h2 class="section-title">Was die Daten über Taten sagen</h2>
+  <p class="interpret-lead">{{ insights.interpretation.headline|safe }}</p>
+  <p class="interpret-basis">
+    Basis: {{ insights.interpretation.stats.dated }} Tatdaten und
+    {{ insights.interpretation.stats.timed }} Uhrzeiten aus Meldungstexten
+    (nicht amtliche Statistik).
+  </p>
+
+  {% if insights.interpretation.findings %}
+  <div class="finding-cards">
+    {% for f in insights.interpretation.findings %}
+    <article class="finding-card {{ f.strength }}">
+      <span class="finding-icon" aria-hidden="true">{{ f.icon }}</span>
+      <h3>{{ f.title }}</h3>
+      <p>{{ f.body|safe }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <details class="limitations-box">
+    <summary>Was diese Auswertung nicht leisten kann</summary>
+    <ul>
+      {% for note in insights.interpretation.limitations %}
+      <li>{{ note|safe }}</li>
+      {% endfor %}
+    </ul>
+  </details>
+</section>
+
+<section class="card socio-section">
+  <h2 class="section-title">Gesellschaft, Wetter &amp; Struktur</h2>
+  <p class="section-intro">
+    Sozialpolitisch lesbare Muster — Wetter (Open-Meteo Berlin), Bezirke &amp; Einkommen (Näherung),
+    Gewalt gegen Frauen (Text-Heuristik, kein Femizid-Register).
+  </p>
+
+  <div class="socio-grid">
+    {% if insights.socio.weather.ready %}
+    <div class="socio-panel weather-panel">
+      <h3>🌡️ Hitze, Kälte und Taten</h3>
+      <p class="viz-desc">
+        Tatdatum aus Text × Tageshöchsttemperatur in Berlin.
+        <strong>1,0×</strong> = Durchschnitt; darüber = mehr Meldungen pro Tag in dieser Wetterlage.
+        Zeitraum: {{ insights.socio.weather.period }}.
+      </p>
+      <div class="weather-bars">
+        {% for b in insights.socio.weather.bins %}
+        <div class="weather-row" title="{{ b.label }}: {{ b.incidents }} Taten / {{ b.days }} Tage">
+          <span class="weather-label">{{ b.label }}</span>
+          <span class="weather-track">
+            <span class="weather-fill {% if b.relative >= 1.2 %}high{% elif b.relative < 0.9 %}low{% endif %}"
+                  style="width: {{ b.height_pct }}%"></span>
+          </span>
+          <span class="weather-val">{{ b.relative }}×</span>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="viz-foot">{{ insights.socio.weather.source }}</p>
+    </div>
+    {% else %}
+    <div class="socio-panel muted">
+      <h3>🌡️ Wetter</h3>
+      <p>{{ insights.socio.weather.reason or 'Wetter-Cache wird geladen…' }}</p>
+    </div>
+    {% endif %}
+
+    {% if insights.socio.gender_violence.ready %}
+    <div class="socio-panel">
+      <h3>⚠️ Gewalt gegen Frauen (in Meldungen)</h3>
+      <p class="viz-desc">{{ insights.socio.gender_violence.caveat }}</p>
+      <div class="socio-stat-row">
+        <div class="socio-stat">
+          <span class="socio-num">{{ insights.socio.gender_violence.total }}</span>
+          <span class="socio-lbl">relevante Meldungen</span>
+        </div>
+        <div class="socio-stat">
+          <span class="socio-num">~{{ insights.socio.gender_violence.share_of_totungs_pct }}%</span>
+          <span class="socio-lbl">der Tötungs-Meldungen</span>
+        </div>
+      </div>
+      {% if insights.socio.gender_violence.samples %}
+      <ul class="socio-samples">
+        {% for s in insights.socio.gender_violence.samples %}
+        <li><a href="/meldung/{{ s.id }}">{{ s.title }}</a></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if insights.socio.income.ready %}
+    <div class="socio-panel income-panel">
+      <h3>🏘️ Bezirk &amp; Einkommen</h3>
+      <p class="viz-desc">
+        Meldungsanzahl vs. Median-Einkommen (Index, Berlin ≈ 70).
+        Korrelation r = <strong>{{ insights.socio.income.correlation_r }}</strong>.
+        {{ insights.socio.income.caveat }}
+      </p>
+      <div class="income-chart">
+        {% for p in insights.socio.income.points %}
+        <div class="income-row" title="{{ p.district }}: {{ p.count }} Meldungen, Einkommen-Index {{ p.income_index }}">
+          <span class="income-name">{{ p.district[:16] }}{% if p.district|length > 16 %}…{% endif %}</span>
+          <span class="income-bar-wrap">
+            <span class="income-bar" style="width: {{ (p.count / insights.socio.income.top_volume.count * 100)|int }}%"></span>
+          </span>
+          <span class="income-idx">{{ p.income_index }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="viz-foot">Zahl rechts = Einkommens-Index (höher = wohlhabender Bezirk)</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card timeline-section">
+  <div class="timeline-header">
+    <h2>Zeitlicher Verlauf der Taten</h2>
+    <nav class="timeline-tabs" aria-label="Zeitebene">
+      <a href="?granularity=month{% if q %}&q={{ q|urlencode }}{% endif %}{% if district_filter %}&district={{ district_filter|urlencode }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if tag_filter %}&tag={{ tag_filter|urlencode }}{% endif %}"
+         class="{% if granularity == 'month' %}active{% endif %}">Monate</a>
+      <a href="?granularity=week{% if q %}&q={{ q|urlencode }}{% endif %}{% if district_filter %}&district={{ district_filter|urlencode }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if tag_filter %}&tag={{ tag_filter|urlencode }}{% endif %}"
+         class="{% if granularity == 'week' %}active{% endif %}">Wochen</a>
+      <a href="?granularity=season{% if q %}&q={{ q|urlencode }}{% endif %}{% if district_filter %}&district={{ district_filter|urlencode }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if tag_filter %}&tag={{ tag_filter|urlencode }}{% endif %}"
+         class="{% if granularity == 'season' %}active{% endif %}">Jahreszeiten</a>
+      <a href="?granularity=month_of_year{% if q %}&q={{ q|urlencode }}{% endif %}{% if district_filter %}&district={{ district_filter|urlencode }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if tag_filter %}&tag={{ tag_filter|urlencode }}{% endif %}"
+         class="{% if granularity == 'month_of_year' %}active{% endif %}">Jan–Dez</a>
+      <a href="?granularity=weekday{% if q %}&q={{ q|urlencode }}{% endif %}{% if district_filter %}&district={{ district_filter|urlencode }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}{% if tag_filter %}&tag={{ tag_filter|urlencode }}{% endif %}"
+         class="{% if granularity == 'weekday' %}active{% endif %}">Wochentag</a>
+    </nav>
+  </div>
+  <p class="timeline-meta">
+    {{ timeline_meta.label }}
+    {% if timeline_meta.peak %}
+    · Spitze: <strong>{{ timeline_meta.peak.label }}</strong> ({{ timeline_meta.peak.count }} Meldungen)
+    {% endif %}
+    · {{ timeline_meta.total_in_chart }} mit erkanntem Tatdatum
+    {% if timeline_meta.coverage_pct %}({{ timeline_meta.coverage_pct }}% der Texte){% endif %}
+    <span style="opacity:0.8">— horizontal scrollen</span>
+  </p>
+  <div class="timeline-scroll">
+    <div class="timeline-bars" style="--bar-w: {{ timeline_meta.bar_width }}px">
+      {% for bar in timeline_bars %}
+      <div class="timeline-col {% if timeline_meta.peak and bar.period == timeline_meta.peak.period %}peak{% endif %}"
+           title="{{ bar.label }}: {{ bar.count }} Meldungen">
+        <div class="col-bar" style="height: {{ bar.height_pct }}%"></div>
+        <span class="col-label">{{ bar.label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="timeline-legend">
+    <span>■ Normal</span>
+    <span style="color:#ea580c">■ Stärkster Balken</span>
+    <span>Hohe Balken = mehr Taten in diesem Zeitraum (laut Text)</span>
+  </div>
+</section>
+
+<section class="insights-section">
+  <h2 class="section-title">Muster im Detail</h2>
+  <p class="section-intro">Die Grafiken unten untermauern die Erkenntnisse oben — Tatzeit und Tatdatum aus den Texten.</p>
+
+  <div class="insights-grid-2">
+    <div class="card viz-card">
+      <h3>Wann im Jahr? <span class="viz-sub">Heatmap</span></h3>
+      <p class="viz-desc">
+        Wo sich Taten zeitlich ballen — z. B. bestimmte Monate oder Sommer vs. Winter.
+        {% if insights.heatmap.peak %}
+        Auffällig: <strong>{{ insights.heatmap.peak.label }} {{ insights.heatmap.peak.year }}</strong>.
+        {% endif %}
+      </p>
+      <div class="heatmap-wrap">
+        <div class="heatmap-grid">
+          <div class="heat-corner"></div>
+          {% for m in insights.heatmap.months %}
+          <div class="heat-month-label">{{ m }}</div>
+          {% endfor %}
+          {% for row in insights.heatmap.rows %}
+          <div class="heat-year-label">{{ row.year }}</div>
+          {% for cell in row.months %}
+          <div class="heat-cell {% if cell.count == 0 %}empty{% elif cell.count == insights.heatmap.max_count %}peak{% endif %}"
+               style="--int: {{ cell.intensity }}"
+               title="{{ cell.label }} {{ row.year }}: {{ cell.count }}">
+            {% if cell.count > 0 and cell.intensity > 0.55 %}<span class="heat-num">{{ cell.count }}</span>{% endif %}
+          </div>
+          {% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+      <div class="heat-legend">
+        <span>wenig</span>
+        <span class="heat-scale"></span>
+        <span>viel (max {{ insights.heatmap.max_count }})</span>
+      </div>
+    </div>
+
+    <div class="card viz-card incident-time-card">
+      <h3>Tages- und Wochenrhythmus</h3>
+      <p class="viz-desc">
+        Wann passiert laut Text am häufigsten etwas — Abendpeak, Wochenende, Wochentag.
+      </p>
+      <h4 class="sub-h4">Uhrzeit</h4>
+      <div class="hour-chart">
+        {% for bar in insights.incident_hour.bars %}
+        <div class="hour-col {% if bar.is_peak %}peak{% elif bar.is_evening %}evening{% endif %}"
+             title="{{ bar.label }}:00 — {{ bar.count }} Taten">
+          <div class="hour-bar" style="height: {{ bar.height_pct }}%"></div>
+          <span class="hour-label">{% if bar.hour % 3 == 0 %}{{ bar.label }}{% endif %}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <h4 class="sub-h4">Wochentag</h4>
+      <div class="weekday-chart">
+        {% for bar in insights.incident_weekday.bars %}
+        <div class="wd-col {% if bar.is_peak %}peak{% endif %}"
+             title="{{ bar.label }}: {{ bar.count }}">
+          <div class="wd-bar" style="height: {{ bar.height_pct }}%"></div>
+          <span class="wd-label">{{ bar.label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <details class="card more-viz">
+    <summary>Weitere Auswertungen (Kategorien, Bezirke, Archiv)</summary>
+    <div class="insights-grid-3">
+      <div class="viz-card">
+        <h3>Art der Meldung</h3>
+        <p class="viz-desc">Schlagwörder — z. B. Kriminalität vs. Verkehr (sagt etwas über die <em>Art</em> der Tat).</p>
+        <div class="tag-bubbles">
+          {% for b in insights.tag_bubbles %}
+          <a href="?{{ filter_qs }}&tag={{ b.name|urlencode }}"
+             class="tag-bubble"
+             style="width: {{ b.size_px }}px; height: {{ b.size_px }}px; background: {{ b.color }};"
+             title="{{ b.name }}: {{ b.count }}">
+            <span class="tb-name">{{ b.name }}</span>
+            <span class="tb-count">{{ b.count }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="viz-card">
+        <h3>Wo?</h3>
+        <p class="viz-desc">Bezirke — räumliche Verteilung der Meldungen.</p>
+        <div class="donut-row">
+          <div class="donut" style="background: {{ insights.district_share.gradient }}"></div>
+          <ul class="donut-legend">
+            {% for s in insights.district_share.slices %}
+            <li>
+              <span class="dot" style="background:{{ s.color }}"></span>
+              <a href="?{{ filter_qs }}&district={{ s.district|urlencode }}">{{ s.district[:18] }}{% if s.district|length > 18 %}…{% endif %}</a>
+              <span class="pct">{{ s.pct_all }}%</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      <div class="viz-card">
+        <h3>Jahresvergleich {{ insights.yoy_months.years_label }}</h3>
+        <p class="viz-desc">Verändert sich das Monatsmuster über die Jahre?</p>
+        <div class="yoy-chart">
+          {% for m in range(1, 13) %}
+          <div class="yoy-month">
+            <div class="yoy-bars">
+              {% for s in insights.yoy_months.series %}
+              {% set pt = s.points[m - 1] %}
+              <div class="yoy-bar" style="height: {{ pt.height_pct }}%; background: {{ s.color }}"
+                   title="{{ s.year }} {{ pt.label }}: {{ pt.count }}"></div>
+              {% endfor %}
+            </div>
+            <span class="yoy-label">{{ ['J','F','M','A','M','J','J','A','S','O','N','D'][m-1] }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="yoy-legend">
+          {% for s in insights.yoy_months.series %}
+          <span><i style="background:{{ s.color }}"></i>{{ s.year }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <p class="viz-desc archive-note">
+      Hinweis Archiv: Vor 2020 sind auf berlin.de nur wenige Meldungen online — Zeitmuster ab 2020 sind belastbarer.
+    </p>
+  </details>
+</section>
+
 <div class="layout-2col">
   <aside class="sidebar-stats">
     <div class="card compact">
@@ -87,19 +386,6 @@
       </ul>
     </div>
 
-    <div class="card compact">
-      <h3>Letzte Monate</h3>
-      <ul class="bar-list">
-        {% for row in by_month %}
-        <li>
-          <span class="bar-label">{{ row.month }}</span>
-          <span class="bar-track"><span class="bar-fill month" style="width:{{ (row.count / max_month_count * 100)|int }}%"></span></span>
-          <span class="bar-count">{{ row.count }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-
     {% if runs %}
     <div class="card compact muted-box">
       <h3>Scraper</h3>
@@ -116,6 +402,7 @@
   <main class="list-panel">
     <div class="card">
       <form class="filters" method="get">
+        <input type="hidden" name="granularity" value="{{ granularity }}">
         <input type="search" name="q" value="{{ q }}" placeholder="Suchen…" aria-label="Suche">
         <select name="district" aria-label="Bezirk">
           <option value="">Alle Bezirke</option>
@@ -173,9 +460,9 @@
 
       {% if pages > 1 %}
       <div class="pagination">
-        {% if page > 1 %}<a href="?page={{ page-1 }}&q={{ q }}&district={{ district_filter }}&year={{ year_filter }}&tag={{ tag_filter }}">←</a>{% endif %}
+        {% if page > 1 %}<a href="?page={{ page-1 }}&granularity={{ granularity }}&q={{ q }}&district={{ district_filter }}&year={{ year_filter }}&tag={{ tag_filter }}">←</a>{% endif %}
         <span>{{ page }} / {{ pages }}</span>
-        {% if page < pages %}<a href="?page={{ page+1 }}&q={{ q }}&district={{ district_filter }}&year={{ year_filter }}&tag={{ tag_filter }}">→</a>{% endif %}
+        {% if page < pages %}<a href="?page={{ page+1 }}&granularity={{ granularity }}&q={{ q }}&district={{ district_filter }}&year={{ year_filter }}&tag={{ tag_filter }}">→</a>{% endif %}
       </div>
       {% endif %}
     </div>

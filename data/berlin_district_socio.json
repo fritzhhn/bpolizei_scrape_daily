@@ -1,0 +1,17 @@
+{
+  "_source": "Näherungswerte: Median-Einkommen/Haushalt und Arbeitslosenquote (Berlin, ~2022–2023, öffentliche Regionalstatistik). Nur für Vergleich zwischen Bezirken, keine Mikrodaten.",
+  "districts": {
+    "Mitte": {"income_index": 78, "unemployment_pct": 7.8, "label": "überdurchschnittlich"},
+    "Friedrichshain-Kreuzberg": {"income_index": 62, "unemployment_pct": 9.2, "label": "unter Berlin-Schnitt"},
+    "Pankow": {"income_index": 88, "unemployment_pct": 5.9, "label": "eher wohlhabend"},
+    "Charlottenburg-Wilmersdorf": {"income_index": 95, "unemployment_pct": 5.4, "label": "eher wohlhabend"},
+    "Spandau": {"income_index": 72, "unemployment_pct": 8.1, "label": "Mittelfeld"},
+    "Steglitz-Zehlendorf": {"income_index": 98, "unemployment_pct": 4.8, "label": "eher wohlhabend"},
+    "Tempelhof-Schöneberg": {"income_index": 76, "unemployment_pct": 7.2, "label": "Mittelfeld"},
+    "Neukölln": {"income_index": 48, "unemployment_pct": 11.5, "label": "eher einkommensschwach"},
+    "Treptow-Köpenick": {"income_index": 82, "unemployment_pct": 6.5, "label": "Mittelfeld"},
+    "Marzahn-Hellersdorf": {"income_index": 58, "unemployment_pct": 10.1, "label": "eher einkommensschwach"},
+    "Lichtenberg": {"income_index": 65, "unemployment_pct": 8.9, "label": "unter Berlin-Schnitt"},
+    "Reinickendorf": {"income_index": 70, "unemployment_pct": 8.4, "label": "Mittelfeld"}
+  }
+}
