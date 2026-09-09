@@ -8,7 +8,7 @@ from collections import Counter
 from datetime import datetime
 from math import ceil
 
-from flask import Flask, abort, render_template, request
+from flask import Flask, abort, jsonify, render_template, request
 
 from urllib.parse import urlencode
 
@@ -22,6 +22,7 @@ from dashboard.helpers import (
     format_datetime,
 )
 from dashboard.insights import build_all_insights
+from dashboard.mosaic_data import build_daily_mosaic
 from scraper.config import ARCHIV_START_YEAR, DB_PATH
 from scraper.parse import tags_from_json
 
@@ -223,6 +224,26 @@ def detail(article_id: str):
     if row is None:
         abort(404)
     return render_template("detail.html", m=enrich_row(row), format_datetime=format_datetime)
+
+
+@app.route("/mosaic")
+def mosaic():
+    conn = get_db()
+    if conn is None:
+        return render_template("mosaic.html", ready=False)
+    conn.close()
+    return render_template("mosaic.html", ready=True)
+
+
+@app.route("/api/daily-mosaic")
+def daily_mosaic_api():
+    conn = get_db()
+    if conn is None:
+        abort(404)
+    try:
+        return jsonify(build_daily_mosaic(conn))
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":
