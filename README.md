@@ -97,6 +97,89 @@ Wetter-Cache (Open-Meteo Berlin, einmalig):
 PYTHONPATH=. python3 scripts/build_weather_cache.py
 ```
 
+### Berlin Daily Grid / Berlin Crime Weather Mosaic
+
+Der Prototyp unter `/mosaic` zeigt eine dichte Pixelwand der gescrapten öffentlichen Polizeipressemeldungen. Jede Zelle steht für genau ein distinct Datum mit Polizeimeldungsdaten; es werden keine Füllzellen für fehlende Tage erzeugt. Die Ansicht ist eine explorative Visualisierung von Pressemeldungen und Wetterdaten, keine amtliche Kriminalstatistik.
+
+```bash
+export PYTHONPATH="."
+python -m dashboard.app
+# öffnen: http://127.0.0.1:5050/mosaic
+```
+
+JSON-Daten:
+
+```text
+GET /api/daily-mosaic
+```
+
+Datenprüfung ohne Flask:
+
+```bash
+PYTHONPATH=. python3 scripts/inspect_mosaic_data.py
+```
+
+Aktueller Stand der mitgelieferten Datenbank:
+
+- Meldungen gesamt: `14.702`
+- Zeitraum der Report-Daten: `2014-07-17` bis `2026-06-23`
+- Exakte distinct Report-Daten / Zellen im ungefilterten Mosaic: `2.398`
+- Fehlende Kalendertage innerhalb dieses Zeitraums: `1.962`
+- Weather-Join: `2.368 / 2.398` Report-Daten mit Wettertreffer (`98,7%`)
+- Verfügbare Wetterfelder in `data/weather_berlin.db`: `tmax`, `tmin`, `bin`; Temperaturmittel wird im Mosaic als `(tmax + tmin) / 2` abgeleitet. Niederschlag, Regen, Schnee, Wind, Sonnenschein und Bewölkung sind im aktuellen Cache nicht vorhanden.
+
+Die SQL-Grundlage für Report-Daten nutzt bewusst Veröffentlichungs-/Meldungsdatum und nicht die heuristische Tatdatum-Erkennung aus dem Text:
+
+```sql
+-- report-day expression
+date(COALESCE(published_at, meldung_date))
+
+-- total rows
+SELECT COUNT(*) AS total_rows FROM meldungen;
+
+-- exact date range and cell count
+SELECT
+    MIN(date(COALESCE(published_at, meldung_date))) AS first_date,
+    MAX(date(COALESCE(published_at, meldung_date))) AS last_date,
+    COUNT(DISTINCT date(COALESCE(published_at, meldung_date))) AS distinct_dates
+FROM meldungen
+WHERE date(COALESCE(published_at, meldung_date)) IS NOT NULL;
+
+-- daily counts
+SELECT
+    date(COALESCE(published_at, meldung_date)) AS date,
+    COUNT(*) AS report_count
+FROM meldungen
+WHERE date(COALESCE(published_at, meldung_date)) IS NOT NULL
+GROUP BY date
+ORDER BY date;
+
+-- report rows used for district/tag/title aggregation
+SELECT
+    id,
+    url,
+    title,
+    published_at,
+    meldung_date,
+    district,
+    tags,
+    date(COALESCE(published_at, meldung_date)) AS report_date
+FROM meldungen
+WHERE date(COALESCE(published_at, meldung_date)) IS NOT NULL
+ORDER BY report_date ASC, (published_at IS NULL), published_at ASC, id ASC;
+
+-- weather join check
+SELECT
+    COUNT(DISTINCT date(COALESCE(published_at, meldung_date))) AS police_days,
+    COUNT(DISTINCT w.day) AS matched_weather_days
+FROM meldungen AS m
+LEFT JOIN weather.daily AS w
+    ON w.day = date(COALESCE(published_at, meldung_date))
+WHERE date(COALESCE(published_at, meldung_date)) IS NOT NULL;
+```
+
+Anomaly Score: pro Datum wird die Meldungsanzahl mit dem Mittelwert und der Standardabweichung aller vorhandenen Report-Daten desselben Monats und Wochentags verglichen. Das ist ein normalisierter z-Score, kein Vorhersagemodell.
+
 ## Daten
 
 - SQLite: `data/meldungen.db` (wird im Git-Repo mit aktualisiert)
